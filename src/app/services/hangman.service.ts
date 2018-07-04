@@ -1,116 +1,105 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Optional } from '@angular/core';
 import { WordService } from './word.service';
 import { Observable, BehaviorSubject } from 'rxjs';
+
+export interface PuzzleState {
+  puzzle: string[];
+  selectedKeys: string[];
+  triesRemain: number;
+  word: string;
+  isOver: boolean;
+}
+
+export const initialState: PuzzleState = {
+  puzzle: [],
+  selectedKeys: [],
+  triesRemain: 6,
+  word: '',
+  isOver: true
+};
 
 @Injectable({
   providedIn: 'root'
 })
 export class HangmanService {
+  private _puzzleState: PuzzleState;
+  private _source: BehaviorSubject<PuzzleState>;
 
-  private _word: string;
-  private _triesRemain: number;
-  private _isOver: boolean;
-  private _puzzle: string[];
-  private _source: BehaviorSubject<any>;
-  private _selectedKeys: string[];
-  private _isLoading: boolean;
-
-  constructor(private wordService: WordService) {
-    this._source = new BehaviorSubject<any>({
-      'puzzle': this._puzzle,
-      'selectedKeys': this._selectedKeys,
-      'triesRemain': this._triesRemain
-    });
-    this.reset();
+  constructor(
+    private wordService: WordService) {
+    this._puzzleState = initialState;
+    this._source = new BehaviorSubject<PuzzleState>(this._puzzleState);
   }
 
-  private emitChanges() {
-    this._source.next({
-      'puzzle': this._puzzle,
-      'selectedKeys': this._selectedKeys,
-      'triesRemain': this._triesRemain
-    });
-  }
-
-  public puzzleChanges(): Observable<any> {
+  public puzzleChanges(): Observable<PuzzleState> {
     return this._source.asObservable();
   }
 
+  private emitChanges() {
+    this._source.next(this._puzzleState);
+  }
+
   private reset() {
-    this._word = '';
-    this._puzzle = [];
-    this._triesRemain = 6;
-    this._isOver = true;
-    this._selectedKeys = [];
-    this._isLoading = false;
+    this._puzzleState = initialState;
     this.emitChanges();
   }
 
   public start() {
-    this._isLoading = true;
     this.reset();
-    this._isOver = false;
-    this.wordService.get().subscribe(data => {
-      this._word = data.word;
-      this._puzzle = Array.apply('', Array(this._word.length)).map(_ => '');
-      this._isLoading = false;
-      this.emitChanges();
-    });
+    this.wordService
+      .get()
+      .subscribe(data => {
+        this._puzzleState = {
+          ...initialState,
+          word: data.word,
+          puzzle: Array.apply('', Array(data.word.length)).map(_ => ''),
+          isOver: false,
+        };
+        this.emitChanges();
+      });
   }
 
-  public word() {
-    return this._word;
+  private isSelected(k: string): boolean {
+    return this._puzzleState.selectedKeys.indexOf(k) >= 0;
   }
 
-  public triesRemain(): number {
-    return this._triesRemain;
+  private isWrong(letter: string) {
+    return this._puzzleState.word.indexOf(letter) < 0;
   }
 
-  public isSelected(k: string): boolean {
-    return this._selectedKeys.indexOf(k) >= 0;
-  }
+  public guess(letter: string) {
 
-  public guess(letter: string): boolean {
     if (this.isSelected(letter)) {
-      return false;
+      return;
     }
-    this._selectedKeys.push(letter);
-    let pos = this._word.indexOf(letter);
-    if (pos < 0) {
-      if ((--this._triesRemain) <= 0) {
-        this._isOver = true;
-      }
+
+    this._puzzleState = {
+      ...this._puzzleState,
+      selectedKeys: [...this._puzzleState.selectedKeys, letter]
+    };
+
+    if (this.isWrong(letter)) {
+      const triesRemain = this._puzzleState.triesRemain - 1;
+      this._puzzleState = { ...this._puzzleState, triesRemain, isOver: triesRemain <= 0 };
       this.emitChanges();
-      return false;
+      return;
     }
-    this._puzzle[pos] = letter;
 
-    pos = this._word.indexOf(letter, pos + 1);
+    let pos = this._puzzleState.word.indexOf(letter);
+    const puzzle = [...this._puzzleState.puzzle];
+    puzzle[pos] = letter;
+
+    pos = this._puzzleState.word.indexOf(letter, pos + 1);
     while (pos >= 0) {
-      this._puzzle[pos] = letter;
-      pos = this._word.indexOf(letter, pos + 1);
+      puzzle[pos] = letter;
+      pos = this._puzzleState.word.indexOf(letter, pos + 1);
+    }
+    this._puzzleState = { ...this._puzzleState, puzzle };
+
+    if (puzzle.join('') === this._puzzleState.word) {
+      this._puzzleState = { ...this._puzzleState, isOver: true };
     }
 
-    if (this._puzzle.join('') === this._word) {
-      this._isOver = true;
-    }
     this.emitChanges();
-    return true;
-  }
-
-  public getSolvedAt(i: number): string {
-    return this._word.split('')[i];
-  }
-
-  public isOver(): boolean {
-    return this._isOver;
-  }
-
-  public isLoading(): boolean {
-    return this._isLoading;
-  }
-
-  public puzzle(): string[] {
-    return this._puzzle;
   }
 }

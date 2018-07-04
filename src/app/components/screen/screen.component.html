@@ -1,12 +1,14 @@
 <div class="row">
   <div class="col-12">
     <div class="alert alert-warning field-list d-flex justify-content-center mb-3">
-      <div *ngFor="let p of puzzle; let idx = index" class="field" [ngClass]="{'text-danger': (p === '' && isOver())}">{{ p | field : idx }}</div>
+      <div *ngFor="let p of puzz.puzzle; let idx = index"
+        class="field"
+        [ngClass]="{'text-danger': (p === '' && puzz.isOver)}">{{ p | field : idx }}</div>
     </div>
   </div>
 </div>
 
-<div class="text-center" *ngIf="isOver() && word() !== ''">
-  Don't know {{ word() }}?
-  <a href="https://www.google.co.th/search?q={{ word() }}&tbm=isch" target="_blank">Check out their photos</a>.
+<div class="text-center" *ngIf="puzz.isOver && puzz.word !== ''">
+  Don't know {{ puzz.word }}?
+  <a href="https://www.google.co.th/search?q={{ puzz.word }}&tbm=isch" target="_blank">Check out their photos</a>.
 </div>
